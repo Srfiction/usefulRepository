@@ -1,0 +1,191 @@
+def autoNoodle(node = None, name = None, connections = []):
+    noodele = cmds.shadingNode(node, au=True, n=name)
+    for element in connections:
+        input = element[0]
+        value = element[1]
+        if isinstance(value, str) == True:
+            if element[0] == 'outputThisNode':
+                cmds.connectAttr('{}.{}'.format(noodele, element[1]), element[2])
+            else:    
+                cmds.connectAttr(value, '{}.{}'.format(noodele, input))
+        elif isinstance(value, int) == True:
+            cmds.setAttr('{}.{}'.format(noodele, input), value) 
+        elif isinstance(value, float) == True:
+            cmds.setAttr('{}.{}'.format(noodele, input), value)     
+        else:
+            pass      
+    return noodele       
+
+def zero(object, function):
+    if object.count('_') == 2:
+        first = '{}{}'.format(object.split('_')[0], object.split('_')[2].capitalize() )
+        second = object.split('_')[1]
+        name = '{}_{}_{}'.format(first, second, function)
+    else:     
+        name = '{}_{}'.format(object, function)
+    dad = cmds.listRelatives(object, c=False, p=True)   
+    zero = cmds.group(em=True, n=name)
+    pos = cmds.xform(object, m=True, q=True, ws=True)
+    cmds.xform(zero, m=pos, ws=True)
+    cmds.parent(object, zero)
+    if dad:
+        cmds.parent(zero, dad[0])   
+    else:
+        pass
+    return zero
+
+def specific_fethers_chain(between, portion, joint1, joint2, side, joint_parent, relation): 
+    joint_list = []
+    joint1_end = cmds.listRelatives(joint1)[0]
+    joint2_end = cmds.listRelatives(joint2)[0]
+    value = float(1)/(between+1)
+    def create_joints_between(end, j1, j2):     
+        value1 = value * (number+1)
+        value2 = 1-value1
+        bet = cmds.joint(n = 'fether{}{}_{}_{}'.format(str(number).zfill(2), portion, side, end))
+        pC = cmds.parentConstraint(j1, j2, bet)[0]
+        cmds.setAttr('{}.{}W0'.format(pC, j1), value1)
+        cmds.setAttr('{}.{}W1'.format(pC, j2), value2)
+        cmds.delete(pC)
+        return bet, value1
+    for number in range(between):
+        cmds.select(cl=True)
+        for gerachy in [['skn', joint1, joint2], ['end', joint1_end, joint2_end]]:
+            jnt = create_joints_between(gerachy[0], gerachy[1], gerachy[2]) 
+            blender_value = jnt[1]
+            jnt = jnt[0]
+            if relation == 'connection':
+                if gerachy[0] == 'skn':
+                    zero_jnt = zero(jnt, 'zero')
+                    joint_list.append(jnt)
+                    cmds.makeIdentity(apply = True, t = True, r = True, s = True,  n = False, pn = True)
+                    blender = autoNoodle(node = 'blendColors', 
+                                       name = 'fether{}{}_{}_blendColor'.format(str(number).zfill(2), portion, side), 
+                                       connections = [['color1', '{}.rotate'.format(gerachy[1])],
+                                                      ['color2', '{}.rotate'.format(gerachy[2])],
+                                                      ['blender', blender_value]])
+                    cmds.select(jnt)
+                else:
+                    cmds.joint(joint_list[-1], sao = 'yup', oj = 'xyz', e=True, ch=True)      
+                    cmds.connectAttr('{}.output'.format(blender), '{}.rotate'.format(joint_list[-1]))
+                    if joint_parent:
+                        cmds.parent(zero_jnt, joint_parent)       
+            elif relation == 'constrain':   
+                if gerachy[0] == 'skn':
+                    zero_jnt = zero(jnt, 'zero')
+                    joint_list.append(jnt)
+                    cmds.makeIdentity(apply = True, t = True, r = True, s = True,  n = False, pn = True)
+                    cmds.select(jnt)
+                else:
+                    blender_value2 = 1- blender_value
+                    cmds.joint(joint_list[-1], sao = 'yup', oj = 'xyz', e=True, ch=True)  
+                    pC = cmds.orientConstraint(gerachy[1], gerachy[2], joint_list[-1], mo=True)[0]
+                    cmds.setAttr('{}.{}W0'.format(pC, gerachy[1]), blender_value)
+                    cmds.setAttr('{}.{}W1'.format(pC, gerachy[2]), blender_value2)
+                      
+                    if joint_parent:
+                        cmds.parent(zero_jnt, joint_parent) 
+            
+                                                        
+    return joint_list                  
+
+
+
+
+
+def create_control(controlSize, controlName, color):
+    circle1 =cmds.circle(nr = (1, 0, 0), ch = False)
+    circleShape1 = cmds.pickWalk(d = 'down')
+    circle2 =cmds.circle(nr = (0, 1, 0), ch = False)
+    circleShape2 = cmds.pickWalk(d = 'down')
+    circle3 =cmds.circle(nr = (0, 0, 1), ch = False)
+    circleShape3 = cmds.pickWalk(d = 'down')
+    
+    cmds.setAttr (circleShape1[0] + ".overrideEnabled", 1)
+    cmds.setAttr (circleShape2[0] + ".overrideEnabled", 1)
+    cmds.setAttr (circleShape3[0] + ".overrideEnabled", 1)
+    
+    cmds.setAttr (circleShape1[0] + ".overrideColor", color )
+    cmds.setAttr (circleShape2[0] + ".overrideColor", color )
+    cmds.setAttr (circleShape3[0] + ".overrideColor", color )
+    
+    cmds.parent(circleShape3, circleShape2, circle1[0], shape = True, r = True)
+    cmds.delete(circle2[0])
+    cmds.delete(circle3[0])
+    print "-----"
+    print controlName
+    cmds.rename(circle1[0], controlName)
+    cmds.select(controlName)
+    cmds.makeIdentity(apply = True, t = True, r = True, s = True, n = False)
+
+    return controlName
+generate_control = True
+side = 'l'
+
+
+shoulder_pos = cmds.xform('shoulder_{}_loc'.format(side), t=True, ws=True, q=True)
+elbow_pos = cmds.xform('elbow_{}_loc'.format(side), t=True, ws=True, q=True)
+hand_pos = cmds.xform('hand_{}_loc'.format(side), t=True, ws=True, q=True)
+fether_pos = cmds.xform('fether_{}_loc'.format(side), t=True, ws=True, q=True)
+
+
+#mainChain
+for pos, name in [[shoulder_pos, 'shoulder'], [elbow_pos, 'elbow'], [hand_pos, 'hand'], [fether_pos, 'fether']]:
+    jnt = cmds.joint(n='{}_{}_jnt'.format(name, side), position = pos)
+    if generate_control == True:
+        ctrl = create_control(controlSize = 3, controlName='{}FK_{}_ctrl'.format(name, side), color = 5)
+        cmds.xform(ctrl, m = cmds.xform(jnt, q=True, ws=True, m=True), ws=True)
+        ref = zero([ctrl], 'ref')
+        zero_ctrl = zero([ref], 'zero')
+        if name == 'shoulder':
+            previous_ctrl = ctrl
+        else:
+            cmds.parent(zero_ctrl, previous_ctrl)
+            previous_ctrl = ctrl    
+        cmds.select(jnt, add=False)
+    else:
+        pass    
+    cmds.parentConstraint(ctrl, jnt)    
+    
+cmds.joint('shoulder_{}_jnt'.format(side), sao = 'yup', oj = 'xyz', e=True, ch=True)
+        
+#Fether Controlsç
+
+main_fefthers_list = [['fether_l_loc1', 'fether04', 'fether_{}_jnt'.format(side)],['fether_l_loc2', 'fether03', 'hand_{}_jnt'.format(side)],['fether_l_loc3', 'fether02', 'elbow_{}_jnt'.format(side)],['fether_l_loc4', 'fether01', 'shoulder_{}_jnt'.format(side)]]
+main_fether_joint_list = []
+for loc, name, parent_joint in main_fefthers_list:
+    cmds.select(cl=True)
+    loc2 = cmds.listRelatives(loc, shapes=False)[1]
+    initial_pos = cmds.xform(loc, q=True, t=True, ws=True)
+    end_pos = cmds.xform(loc2, q=True, t=True, ws=True)
+    
+    initial_jnt = cmds.joint(n='{}_{}_jnt'.format(name, side), position = pos)
+    end_jnt = cmds.joint(n='{}End_{}_jnt'.format(name, side), position = pos)
+    
+    cmds.xform(initial_jnt, t=initial_pos, ws=True)
+    cmds.xform(end_jnt, t=end_pos, ws=True)
+    if generate_control == True:
+        ctrl = create_control(controlSize = 3, controlName='{}_{}_ctrl'.format(name, side), color = 5)
+        cmds.xform(ctrl, m = cmds.xform(initial_jnt, q=True, ws=True, m=True), ws=True)
+        ref = zero(ctrl, 'ref')
+        zero_ctrl = zero(ref, 'zero')
+    else:
+        pass        
+    cmds.joint(initial_jnt, sao = 'yup', oj = 'xyz', e=True, ch=True)   
+    cmds.parent(initial_jnt, parent_joint)
+    for axis in 'xyz':
+        cmds.parentConstraint(ctrl, initial_jnt, mo=True) 
+    main_fether_joint_list.append(initial_jnt)
+    
+#create between joints
+for num, part in zip(enumerate(main_fether_joint_list),['hand', 'elbow', 'shoulder']):
+    if part == 'hand':
+        relation = 'connection'
+    else:
+        relation = 'constrain'   
+    fethers = specific_fethers_chain(between = 5, joint1 = main_fether_joint_list[num[0]], joint2 = main_fether_joint_list[num[0]+1], side = side, portion = part, joint_parent = '{}_{}_jnt'.format(part, side), relation = relation)  
+    if num[0]+2 == len(main_fether_joint_list):
+        break    
+ 
+    
+    
