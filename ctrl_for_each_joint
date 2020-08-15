@@ -1,0 +1,7 @@
+for jnt in cmds.ls(sl=True):
+    ctrl = cmds.circle(n=jnt.replace('_jnt', '_ctr'))
+    zero = cmds.group(em=True, n= jnt.replace('_jnt', '_zero'))
+    cmds.parent(ctrl, zero)
+    pos = cmds.xform(jnt, m=True, ws=True, q=True)
+    cmds.xform(zero, m=pos, ws=True)
+    cmds.parentConstraint(ctrl, jnt)
