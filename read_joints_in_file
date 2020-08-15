@@ -1,0 +1,11 @@
+
+joint_list = []
+joint_suffix = '_skn'
+for line in open('C:\Users\pepe_\Documents\machine.xml'):
+    for word in line.split():
+        if joint_suffix in word:
+            joint_list.append(word.replace('source=', '').replace('"', ''))
+
+
+for jnt in joint_list:        
+    cmds.select(jnt, add=True)
